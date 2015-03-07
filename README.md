@@ -43,7 +43,7 @@ Single indirect and double indirect are exactly what the book says, and each is 
 
 Inode can be used both for file and category. File Inode’s pointers contains blocks of file content, while category Inode’s pointers contains blocks of categories. Each sub file or category of a category node is 32 bytes, 1 byte is for differentiate file(1) and category(0). 8 bytes are for sub file or category inode address. And the internal 32 -1 -8 -1 = 22 bytes are for name.(The extra * is taken into consideration). So the first block of a directory may look like the following:
 
-<img src="/pictures/Directory_Block" alt="Directory_Block" width="500"/>
+<img src="/pictures/Directory_Block.jpg" alt="Directory Block" width="500"/>
 
 The third slot is a directory node pointer which points to 33333333, the fourth is a file node pointer which points to 44444444. Pay attention that I save “.” and “..” as directory content so that cd . and cd .. can be operated as cd to other ordinary sub directories. The “..” address for root node is itself.
 
