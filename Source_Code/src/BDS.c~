@@ -1,0 +1,224 @@
+#include "headers.h"
+//split the command
+int parseLine (char *line, char *command_array[]) {
+    char *p;
+    int count = 0;
+	line = strtok (line, "\n");
+    p = strtok (line, " ");
+    while (p) {
+        command_array[count] = p;
+        count ++;
+        p = strtok (NULL, " ");
+    }
+    return count;
+}
+
+
+//error report
+void error (const char *msg) {
+    perror (msg);
+    exit(1);
+}
+
+int main (int argc, char* argv[]) { 
+    
+    //arguments checking
+    if (argc < 6) {
+        printf ("Error: some arguments are missing.\n");
+        exit(1);
+    }
+
+    char *filename = argv[1];
+    int cylinder_num = atoi (argv[2]);
+    int sector_per_cylinder = atoi (argv[3]);
+    int track_delay = atoi (argv[4]);
+    int portno = atoi (argv[5]);
+
+    int n;
+
+    //open the file
+    int fd = open (filename, O_RDWR | O_CREAT, 0777);
+    if (fd < 0) {
+        printf ("Error:Could not open file '%s'.\n",filename);
+        exit(-1);
+    }
+    
+    //stretch the file size to the size of the simulated disk
+    long FILESIZE = 256 * cylinder_num * sector_per_cylinder;
+    int result = lseek (fd, FILESIZE - 1, SEEK_SET);
+    if (result == -1) {
+        perror ("Error calling lseek() to 'stretch' the file.");
+        exit (-1);
+    }
+
+    //write something at the end of the file to ensure the file actually have the new size
+    result = write (fd, "", 1);
+    if (result != 1) {
+        perror ("Error writing last byte of the file.");
+        close (fd);
+        exit (-1);
+    }
+    
+    //map the file
+    char *diskfile;
+    diskfile = (char*) mmap(0, FILESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (diskfile == MAP_FAILED) {
+        close(fd);
+        printf ("Error: Could not map file.\n");
+        exit (-1);       
+    }
+
+    
+    //create a socket 
+    int sockfd, newsockfd;
+    socklen_t clilen;
+    char buffer[1024];
+    char *command[10];
+    struct sockaddr_in serv_addr, cli_addr;
+    int cur_cylinder = 0, next_cylinder;
+    int next_sector;    
+    int delay_time;
+    char read_char[257];
+
+
+    sockfd = socket (AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+        error ("Error opening socket");
+    bzero( (char*) &serv_addr, sizeof(serv_addr)); //set all values in a buffer to zero
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+
+    if (bind (sockfd, (struct sockaddr *) &serv_addr, sizeof (serv_addr)) < 0) //bind a socket to a address
+        error ("Error on binding");
+
+    listen (sockfd, 5); //listen on the socket for connections;5 connections can be waiting.
+    clilen = sizeof (cli_addr);
+    newsockfd = accept (sockfd, (struct sockaddr*) &cli_addr, &clilen);//block the process until a client connect to the server.
+    
+    printf ("connected!\n");    
+
+    if (newsockfd < 0)
+        error ("Error on accept");
+	
+    while (true) {
+        bzero (buffer, 1024);
+        n = read(newsockfd, buffer, 1023);
+        if (n < 0) error ("Error reading from socket");
+  
+        int argu_num = parseLine (buffer, command);
+
+        if (!strcmp(command[0], "exit"))   {	
+			n = write (newsockfd, "Server exit!", 12);
+			if (n < 0) error ("Error writing to socket");	
+			break;		
+		}
+        else if (!strcmp(command[0], "I") && argu_num == 1) {
+            bzero(buffer, 1024);
+            //strcpy(buffer, "The number of cylinder is: ");
+            strcpy(buffer, argv[2]);
+            //strcat(buffer, "\nThe number of sector per cylinder is: ");
+            strcat(buffer, " ");
+            strcat(buffer, argv[3]);
+            n = write (newsockfd, buffer, strlen(buffer));
+            if (n < 0) error ("Error writing to socket");
+        }
+        else if (!strcmp(command[0], "R")) {
+            if (argu_num != 3) {
+                n = write (newsockfd, "Wrong argument number!", 22);
+                if (n < 0) error ("Error writing to socket");
+                continue;
+            }
+            next_cylinder = atoi (command[1]);
+            next_sector = atoi (command[2]);
+            delay_time = track_delay * abs(next_cylinder - cur_cylinder);
+            cur_cylinder = next_cylinder;           
+            if (next_cylinder >= cylinder_num || next_sector >= sector_per_cylinder) {
+                n = write (newsockfd, "No", 2);
+                if (n < 0) error ("Error writing to socket");
+            }
+
+            else {
+                //usleep (delay_time);
+                bzero (buffer, 1024);
+                
+                memcpy (read_char, &diskfile[256 * (next_cylinder * sector_per_cylinder + next_sector)], 256);
+				
+                read_char[256] = '\0';
+                strcpy (buffer, "Yes ");
+                strcat (buffer, read_char);
+                
+                n = write (newsockfd, buffer, strlen(buffer));
+                if (n < 0) error ("Error writing to socket");
+            } 
+        }
+		else if (!strcmp(command[0], "W")) {
+            if (argu_num != 5) {
+				printf ("%d", argu_num);
+                n = write (newsockfd, "Wrong argument number!", 22);
+                if (n < 0) error ("Error writing to socket");
+                continue;
+            }
+            next_cylinder = atoi(command[1]);			
+            next_sector = atoi(command[2]);
+			int i;
+            int len = atoi(command[3]);
+            if (next_cylinder >= cylinder_num || next_sector >= sector_per_cylinder || len > 256) {
+                n = write (newsockfd, "No", 2);
+                if (n < 0) error ("Error writing to socket");   
+            }
+
+            else {
+                delay_time = track_delay * abs(next_cylinder - cur_cylinder);
+                cur_cylinder = next_cylinder;
+                //usleep(delay_time);
+			    for (i = 0; i < len; ++i)
+				    buffer[i] = command[4][i];
+			    for (;i < 256; ++i) 
+				    buffer[i] = '0';
+                memcpy(&diskfile[256 * (next_cylinder * sector_per_cylinder + next_sector)], buffer, 256);
+
+                n = write (newsockfd, "Yes", 3);
+                if (n < 0) error ("Error writing to socket");
+            }
+			
+		}
+		else {
+            n = write (newsockfd, "Wrong command, please input again.", 34);
+            if (n < 0) error ("Error writing to socket"); 			
+		}
+}
+    close (fd);
+    close (newsockfd);
+    close (sockfd);
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1071 @@
+
+
+//====================hearer========================
+#include "header.h"
+//================function definiton================
+int parseLine (char *, char **);
+int parseLine2 (char *, char **);
+int parseLine1 (char *, char *);
+void error (const char *);
+void read_socket(int, char *);
+void write_socket(int, const char *); 
+void read_c_s (int, int, int, char *);
+void write_c_s (int, int, int, const char *);
+void update_superblock (int);
+int format (int);
+int make_file (int, const char *);
+void getinfofromdisk (int);
+void update_bitmap (int, int, bool, bool);
+void read_number (int, int, char *, bool);
+void write_number (int, int, const char *, bool);
+void getcontent (int, int);
+void getnofsingledir (int, int, int, char *);
+void getnofinode (int, int, int, char *);
+int getsize (int, int);
+void writenofinode (int, int, int, const char *);
+int getfilenum (int, int);
+int check_repeat (const char *, const char *, int, bool);
+void writeback (int, int, const char *);
+void update_add_file_info (int, int, int) ;
+int find_empty (int, bool);
+void allocate_space (int, int, int);
+void writenofsingledir (int, int, int, const char *);
+void initialdir (int, int, int);
+int make_dir (int, const char *);
+int remove_file (int, const char *);
+int change_dir (int, char *);
+int list (int, const char *);
+int write_to_file (int, const char *, int, const char *);
+int append_to_file (int, const char *, int, const char *);
+int catch_file (int, const char *);
+int remove_dir (int, const char *);
+void remove_dir_inodenum (int, int);
+//===================variable=======================
+int c, s;
+
+int inode_num = 500, data_num = 1982;
+int inode_empty = 499, data_empty = 1981;
+int inode_sector = 125;
+int bitmap_sector_num = 18;
+int bitmap_start_sector = 2481;
+
+int cur_dir = 0;
+int root = 0;
+char whole_cont[500000];//catch file
+char l[500000];//function list() output
+char ca[500000];//catch() output
+char map[500000];//bitmap
+//=====================main=========================
+int main (int argc, char *argv[]) {
+	char buffer[1024];
+    int argu_num;
+    char *command[10];
+	int ret;
+
+	//server of FS
+    int portno_FS = atoi (argv[3]);
+    int sockfd2, sockfs;
+    socklen_t clilen;
+    struct sockaddr_in serv_f_addr, cli_addr;
+    sockfd2 = socket (AF_INET, SOCK_STREAM, 0);
+    if (sockfd2 < 0) error ("Error opening socket");
+    bzero ((char*) &serv_f_addr, sizeof (serv_f_addr));
+    serv_f_addr.sin_family = AF_INET;
+    serv_f_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_f_addr.sin_port = htons(portno_FS);
+    if (bind (sockfd2, (struct sockaddr *) &serv_f_addr, sizeof(serv_f_addr)) < 0) error ("Error on binding");
+    listen (sockfd2, 5);
+    clilen = (sizeof (cli_addr));
+    sockfs = accept (sockfd2, (struct sockaddr*) &cli_addr, &clilen);
+    if (sockfs < 0) error ("Error on accept");
+   
+//client of BDS
+    int sockbds, n;
+    struct sockaddr_in serv_b_addr;
+    struct hostent *server;
+    int portno_BDS = atoi (argv[2]);
+    sockbds = socket (AF_INET, SOCK_STREAM, 0);
+    if (sockbds < 0) error ("Error opening socket");
+    server = gethostbyname (argv[1]);
+    if (server == NULL) { printf ("Error, no such host\n"); exit(0);}
+    bzero ((char*) &serv_b_addr, sizeof (serv_b_addr));
+    serv_b_addr.sin_family = AF_INET;
+    bcopy ((char*)server -> h_addr, (char*) &serv_b_addr.sin_addr.s_addr, server -> h_length);
+    serv_b_addr.sin_port = htons(portno_BDS);
+    if (connect (sockbds, (struct sockaddr*) &serv_b_addr, sizeof(serv_b_addr)) < 0) error ("Error connecting");
+	
+
+
+
+
+//ask for the number of cylinder and sector per cylinder
+    write_socket (sockbds, "I\n");
+    read_socket (sockbds, buffer);
+    parseLine (buffer, command);
+    c = atoi (command[0]);
+    s = atoi (command[1]);
+	printf ("%d cylinders and %d sectors per cylinder.\n", c, s);
+	//read_socket (sockfs, buffer);
+	//if (buffer == "y\n") if (format(sockbds)) write_socket (sockfs, "Format sucessful!");
+	format(sockbds);  
+    getinfofromdisk(sockbds);
+	while (true) {
+		printf ("curdir = %d\n", cur_dir);
+		read_socket (sockfs, buffer);
+        argu_num = parseLine (buffer, command);
+        if (!strcmp (command[0], "f") && argu_num == 1) {
+            if (format (sockbds)) write_socket (sockfs, "Format sucessful!");
+            else write_socket (sockfs, "Format failed!");
+        }
+        else if (!strcmp(command[0], "mk") && argu_num == 2) {
+			ret = make_file (sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, "The file have been created!");
+			else if (ret == 1) write_socket (sockfs, "The file have the same name exists!");
+			else if (ret == 2) write_socket (sockfs, "No empty space for inode or data!");
+			
+        }
+		else if (!strcmp (command[0], "mkdir") && argu_num == 2) {
+			ret = make_dir (sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, "The directory have been created!");
+			else if (ret == 1) write_socket (sockfs, "The directory have the same name exists!");
+			else if (ret == 2) write_socket (sockfs, "No empty space for inode or data!");
+		}
+		else if (!strcmp (command[0], "rm") && argu_num == 2) {
+			ret = remove_file (sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, "The file has been removed!");
+			else if (ret == 1) write_socket (sockfs, "A file of this name did not exist!");
+		}
+		else if (!strcmp (command[0], "cd") && argu_num == 2) {
+			ret = change_dir (sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, "Working directory has been changed!");
+			else if (ret == 1) write_socket (sockfs, "No such directory!");
+		}
+		else if (!strcmp (command[0], "rmdir") && argu_num == 2) {
+			ret = remove_dir (sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, "The directory has been removed!");
+			else if (ret == 1) write_socket (sockfs, "A directory of this name did not exist!");
+		}
+		else if (!strcmp (command[0], "ls") && argu_num == 2) {
+			ret = list(sockbds, command[1]);
+			if (ret == 0) write_socket (sockfs, l);
+			else if (ret == 1) write_socket (sockfs, "Wrong boolean flag!");
+		}
+		else if (!strcmp (command[0], "w") && argu_num == 4) {
+			ret = write_to_file (sockbds, command[1], atoi(command[2]), command[3]);
+			if (ret == 0) write_socket (sockfs, "Sucessfully written to the file!");
+			else if (ret == 1) write_socket (sockfs, "No such filename exist!");
+			else if (ret == 2) write_socket (sockfs, "Wrong length of the data!");
+			else if (ret == 3) write_socket (sockfs, "No enough space for the file!");
+		}
+		else if (!strcmp (command[0], "a") && argu_num == 4) {
+			ret = append_to_file (sockbds, command[1], atoi(command[2]), command[3]);
+			if (ret == 0) write_socket (sockfs, "Sucessfully append the file!");
+			else if (ret == 1) write_socket (sockfs, "No such filename exist!");
+			else if (ret == 2) write_socket (sockfs, "Wrong length of the data!");
+			else if (ret == 3) write_socket (sockfs, "No enough space for the file!");
+		}
+		else if (!strcmp (command[0], "cat") && argu_num == 2) {
+			ret = catch_file (sockbds, command[1]);
+			if (ret == 0) { strcpy(ca, "Catch file sucessfully!\n"); strcat(ca, whole_cont); }
+			else if (ret == 1) strcpy(ca, "No such filename exist!");
+			write_socket (sockfs, ca);
+		}
+		
+		else if (!strcmp(command[0], "exit") && argu_num == 1) {
+			write_socket (sockfs, "file system exit!");		
+			break;
+		}
+		else {
+			write_socket (sockfs, "Wrong command!");		
+		}
+	}	
+	close (sockfs);
+	close (sockbds);
+	close (sockfd2);
+	return 0;
+}
+
+int parseLine (char *line, char *command_array[]) {    //parse the line by " "
+	char *p;
+    int count = 0;
+    line = strtok (line, "\n");
+    p = strtok (line, " ");
+    while (p) {
+        command_array[count] = p;
+        count ++;
+        p = strtok (NULL, " ");
+    }
+    return count;
+}
+
+int parseLine1 (char *line, char *command_array[]) {    //parse the line by " "
+	char *p;
+    int count = 0;
+    //line = strtok (line, "\n");
+    p = strtok (line, " ");
+    while (p) {
+        command_array[count] = p;
+        count ++;
+        p = strtok (NULL, " ");
+    }
+    return count;
+}
+
+
+int parseLine2 (char *line, char *command_array[]) {    //parse the line by "/"
+	char *p;
+    int count = 0;
+    line = strtok (line, "\n");
+    p = strtok (line, "/");
+    while (p) {
+        command_array[count] = p;
+        count ++;
+        p = strtok (NULL, "/");
+    }
+    return count;
+}
+
+void error (const char *msg) {
+    perror (msg);
+    exit(0);
+    return;
+}
+
+//============================read & write==========================================================================//
+void read_socket(int sockfd, char *buffer) {                                                                        
+    int n;
+    bzero (buffer, 1024);
+    n = read (sockfd, buffer, 1023);
+    if (n < 0) error ("Error reading from socket");
+    return;
+}
+
+
+void write_socket(int sockfd, const char *buffer) {
+    int n;
+    n = write (sockfd, buffer, strlen(buffer));
+    if (n < 0) error ("Error writing to socket");
+    return;
+}
+
+void read_c_s (int sockfd, int cylinder, int sector, char *buf) {
+    char buffer[1024];
+    char *command[10];
+	int n;
+    bzero (buffer, 1024);
+    sprintf (buffer, "R %d %d", cylinder, sector);
+    write_socket (sockfd, buffer);
+    read_socket (sockfd, buffer);
+    n = parseLine1 (buffer, command);
+    if (n != 1) strcpy (buf, command[1]);
+	else buf[0] = '\0';
+}
+
+void write_c_s (int sockfd, int cylinder, int sector, const char *buf) {
+    char buffer[1024];
+	int a = strlen (buf);
+	bzero (buffer, 1024);
+    sprintf (buffer, "W %d %d %d %s", cylinder, sector, a, buf);
+    write_socket (sockfd, buffer); 
+    read_socket (sockfd, buffer);
+}
+
+void read_number (int sockfd, int number, char *buf, bool iord) {
+    int cy, se;
+    int real_number;
+	char buffer[256];
+	//char inode_content[64];
+	int i, j;
+    if (iord) {
+        real_number = number / 4;        
+    }
+    else {
+        real_number = inode_sector + number;
+    }
+    cy = real_number / s;
+    se = real_number % s;
+    read_c_s (sockfd, cy, se, buffer);
+	if (iord) {
+		for (i = (number % 4) * 64, j = 0; j < 64; ++i, ++j)
+			buf[j] = buffer[i];
+		//buf[j] = '\0';
+		//strcpy(buf, inode_content);	
+	}
+	else {
+		//strcpy (buf, buffer);
+		for (i = 0; i < 256; ++i)
+			buf[i] = buffer[i];
+		buf[i] = '\0';
+	}
+}
+
+void write_number (int sockfd, int number, const char *buf, bool iord) {
+    int cy, se;
+    int real_number;
+    char buffer[256];
+    int i, j;
+    if (iord) real_number = number / 4;
+    else real_number = inode_sector + number;
+    
+    cy = real_number / s;
+    se = real_number % s;
+    if (iord) {
+        read_c_s (sockfd, cy, se, buffer);
+        for (i = (number % 4) * 64, j = 0; j < 64; ++i, ++j)
+            buffer[i] = buf[j];
+        write_c_s (sockfd, cy, se, buffer);
+    }
+    else write_c_s (sockfd, cy, se, buf);
+}
+//============================================================================================================================================//
+void update_superblock (int sockfd) { //更新superblock的值
+    char buffer[1024];
+    sprintf (buffer, "%d/%d/%d/%d/%d/%d/%d/", inode_num, inode_empty, inode_sector, bitmap_sector_num, bitmap_start_sector, data_num, data_empty);
+    write_c_s (sockfd, c - 1, s - 1, buffer);
+}
+
+
+void getinfofromdisk (int sockfd) { //从superblock中获取相应值
+    char buffer[1024];
+    char *num[10];
+    read_c_s (sockfd, c - 1, s - 1, buffer);
+    parseLine2 (buffer, num);
+    inode_num = atoi(num[0]); 
+    inode_empty = atoi(num[1]); 
+    inode_sector = atoi(num[2]);
+    bitmap_sector_num = atoi (num[3]); 
+    bitmap_start_sector = atoi (num[4]);
+    data_num = atoi(num[5]); 
+    data_empty = atoi (num[6]);
+}
+
+void update_bitmap (int sockfd, int n, bool fore, bool iord) { //fore = 1, ->full, fore = 0, ->empty; iord
+        int a;
+		int b;
+        char buf[1024];
+		if (iord) {
+			a = bitmap_start_sector + ( n / 256 );
+			b = n % 256;
+		}
+		else { 
+			a = bitmap_start_sector + (inode_num + n) / 256;
+			b = (n + inode_num) % 256;
+		}
+		read_c_s (sockfd, a/s, a%s, buf);
+		
+		if (fore) buf[b] = '1';
+	    else buf[b] = '0';
+		write_c_s (sockfd, a/s, a%s, buf);
+		if (iord && fore) inode_empty--;
+		else if (iord && !fore) inode_empty++;
+		else if (!iord && fore) data_empty--;
+		else if (!iord && !fore) data_empty++;
+}
+
+int find_empty (int sockfd, bool iord) {  //iord = 1, inode; iord = 0, data
+	int i, j, h;	
+	char op[257];
+	map[0] = '\0';
+	for (i = bitmap_start_sector; i < c * s - 1; ++i) {
+		read_c_s (sockfd, i/s, i%s, op);
+		strcat (map, op); 	
+	}
+	if (!iord)  { j = inode_num; h = bitmap_start_sector - 1; }
+	else  { j = 0; h = inode_num - 1; }
+	for (i = j; i <= h; ++i) {
+		if (map[i] == '0') break;
+	}
+	if (iord) return i;
+	else return (i - inode_num);
+}	
+
+
+
+
+
+
+void update_add_file_info (int sockfd, int size, int filenumber) {
+	update_superblock (sockfd);
+	char op[8];
+	//sprintf (op, "%08d", size + 32);
+	//writenofinode (sockfd, cur_dir, 0, op);
+	sprintf (op, "%08d", filenumber + 1);
+	writenofinode (sockfd, cur_dir, 1, op);
+}
+
+
+void allocate_space (int sockfd, int inode_num, int newsize) {
+	int orisize = getsize (sockfd, inode_num);
+	printf ("ori = %d, new = %d\n", orisize, newsize);
+	int oriblock, newblock;
+	int i;
+	int emptydata;
+	int sing_inode;
+	char op[9];
+	char pointer[9];
+	sprintf (op, "%08d", newsize);
+	writenofinode (sockfd, inode_num, 0, op); //store new size
+	if (orisize == 0) oriblock = 0;
+	else oriblock = (orisize - 1) / 256 + 1;
+	if (newsize == 0) newblock = 0;
+	else newblock = (newsize - 1) / 256 + 1;
+	if (newblock == oriblock) return;
+	if (newblock > oriblock) {
+//direct=============================================================
+		if (newblock <= 4) {
+			for (i = oriblock; i < newblock; ++i) {
+				emptydata = find_empty (sockfd, 0);
+				sprintf (op, "%08d\0", emptydata);
+				writenofinode (sockfd, inode_num, i + 2, op);
+				update_bitmap (sockfd, emptydata, 1, 0);
+			}
+		}
+
+//single=============================================================
+/*
+		else if (newblock == 5) {
+			for (i = oriblock; i < newblock; ++i) {
+				emptydata = find_empty (sockfd, 0);
+				sprintf (op, "%08d\0", emptydata);
+				writenofinode (sockfd, inode_num, i + 2, op);
+				update_bitmap (sockfd, emptydata, 1, 0);
+			}
+			sing_inode = emptydata;
+			emptydata = find_empty (sockfd, 0);
+			sprintf (op, "%08d\0", emptydata);
+			writenofsingledir (sockfd, sing_inode, 0, op);
+			update_bitmap (sockfd, emptydata, 1, 0);
+		}
+*/
+//====================================================================
+		else if (newblock <= 36) {
+			if (oriblock <= 4) {
+				for (i = oriblock; i < 5; ++i) {
+					emptydata = find_empty (sockfd, 0);
+					sprintf (op, "%08d\0", emptydata);
+					writenofinode (sockfd, inode_num, i + 2, op);
+					update_bitmap (sockfd, emptydata, 1, 0);
+				}
+				sing_inode = emptydata;
+				emptydata = find_empty (sockfd, 0);
+				sprintf (op, "%08d\0", emptydata);
+				writenofsingledir (sockfd, sing_inode, 0, op);
+				update_bitmap (sockfd, emptydata, 1, 0);
+				for (i = 5; i < newblock; ++i) {
+					emptydata = find_empty (sockfd, 0);
+					sprintf (op, "%08d\0", emptydata);	
+					writenofsingledir (sockfd, sing_inode, i - 4, op);
+					update_bitmap (sockfd, emptydata, 1, 0);
+	  			}
+			}
+			else {
+				getnofinode (sockfd, inode_num, 6, pointer);
+				for (i = oriblock; i < newblock; ++i) {
+					emptydata = find_empty (sockfd, 0);
+					sprintf (op, "%08d\0", emptydata);	
+					writenofsingledir (sockfd, atoi (pointer), i - 4, op);
+					update_bitmap (sockfd, emptydata, 1, 0);
+	  			}
+			}
+		}
+
+//=====================================================================
+/*
+		else {
+			if (oriblock <= 4) { }//not allowed to read so many bytes
+			if (oriblock <= 36) {
+				getnofinode (sockfd, inode_num, 6, pointer);
+				for (i = oriblock; i < 36; ++i) {
+					emptydata = find_empty (sockfd, 0);
+					sprintf (op, "%08d\0", emptydata);	
+					writenofsingledir (sockfd, atoi (pointer), i - 4, op);
+					update_bitmap (sockfd, emptydata, 1, 0);
+				}
+				
+			}
+			if (oriblock )
+		} //double =.= not complete!
+*/
+	} 
+
+
+//=======================================================================================
+	if (newblock < oriblock) {
+		if (oriblock <= 4) {
+			for (i = oriblock; i > newblock; --i) {
+				getnofinode (sockfd, inode_num, i + 1, op);
+				update_bitmap (sockfd, atoi(op), 0, 0);
+			}
+		}
+		else if (oriblock == 5) {
+			getnofinode (sockfd, inode_num, 6, op);
+			getnofsingledir (sockfd, atoi(op), 0, pointer);
+			update_bitmap (sockfd, atoi(op), 0, 0);
+			update_bitmap (sockfd, atoi(pointer), 0, 0);
+			for (i = oriblock - 1; i > newblock; --i) {
+				getnofinode (sockfd, inode_num, i + 1, op);
+				update_bitmap (sockfd, atoi(op), 0, 0);
+			}
+		}
+		else if(oriblock <= 36) {
+			getnofinode (sockfd, inode_num, 6, op);
+			printf ("oriblock = %d, newblock = %d\n", oriblock, newblock);
+			
+		
+			if (newblock >= 5) {
+				for (i = oriblock; i > newblock; --i) {
+					getnofsingledir (sockfd, atoi(op), i - 5, pointer);
+
+					update_bitmap (sockfd, atoi(pointer), 0, 0);
+				}
+			}
+			else {
+				for (i = oriblock; i > 5; --i) {
+
+					getnofsingledir (sockfd, atoi(op), i - 5, pointer);
+
+					update_bitmap (sockfd, atoi(pointer), 0, 0);
+				}
+				update_bitmap (sockfd, atoi(op), 0, 0);
+				for (i = 4; i > newblock; --i) {
+					getnofinode (sockfd, inode_num, i + 1, op);
+
+					update_bitmap(sockfd, atoi(op), 0, 0);
+				}			
+			}		
+		}
+		else {} //double =.= not complete!
+	}
+
+}
+
+
+
+void writeback (int sockfd, int inode_num, const char *content) {
+	int size = strlen (content);
+	//printf ("size is %d\n", size);
+	char pointer[8];
+	char s_pointer[8];
+	char d_pointer[8];
+	int i, j, h = 0, k;
+	char buf[257];
+	
+	allocate_space (sockfd, inode_num, size); //release or allocate space when write in
+
+	if ( (size - 1) / 256 < 4) {
+		for (i = 2; i < (size - 1) / 256 + 2; ++i) {
+			getnofinode(sockfd, inode_num, i, pointer);
+			for (j = 0, h = (i - 2) * 256; j < 256; ++j, ++h)
+				buf[j] = content[h];
+			buf[j] = '\0';
+			write_number (sockfd, atoi(pointer), buf, 0);					
+		}
+		for (j = 0; h < size; ++j, ++h) buf[j] = content[h];
+		buf[j] = '\0';
+		getnofinode (sockfd, inode_num, i, pointer);
+		write_number (sockfd, atoi(pointer), buf, 0);
+	}
+
+
+	else if ((size - 1) / 256 < 36) {
+		for (i = 2; i <= 5; ++i) {
+			getnofinode (sockfd, inode_num, i, pointer);	
+			for (j = 0, h = (i - 2) * 256; j < 256; ++j, ++h)
+				buf[j] = content[h];
+			buf[j] = '\0';
+			write_number (sockfd, atoi(pointer), buf, 0);
+		}	
+		getnofinode (sockfd, inode_num, 6, pointer);
+		for (i = 0; i < (size - 1) / 256 - 4; ++i) {
+			getnofsingledir(sockfd, atoi(pointer), i, s_pointer);
+			for (j = 0, h = (i + 4) * 256; j < 256; ++j, ++h)
+				buf[j] = content[h];
+			buf[j] = '\0';
+			write_number (sockfd, atoi(s_pointer), buf, 0);
+		}
+		getnofsingledir (sockfd, atoi(pointer), i, s_pointer);
+		h = (i + 4) * 256;		
+		for (j = 0; h < size; ++j, ++h) buf[j] = content[h];
+		buf[j] = '\0';
+		write_number (sockfd, atoi(s_pointer), buf, 0);
+	}
+	else { 
+		for (i = 2; i <= 5; ++i) {
+			getnofinode (sockfd, inode_num, i, pointer);	
+			for (j = 0, h = (i - 2) * 256; j < 256; ++j, ++h)
+				buf[j] = content[h];
+			buf[j] = '\0';
+			write_number (sockfd, atoi(pointer), buf, 0);
+		}
+		getnofinode (sockfd, inode_num, 6, pointer);
+		for (i = 0; i < 32; ++i) {
+			getnofsingledir(sockfd, atoi(pointer), i, s_pointer);
+			for (j = 0, h = (i + 4) * 256; j < 256; ++j, ++h)
+				buf[j] = content[h];
+			buf[j] = '\0';
+			write_number (sockfd, atoi(s_pointer), buf, 0);
+		}
+		getnofinode (sockfd, inode_num, 7, pointer);
+		for (i = 0; i < ((size - 1) / 256 - 36) / 32; ++i)
+			for (j = 0; j < 32; ++j) {
+				getnofsingledir (sockfd, atoi(pointer), i, s_pointer);
+				getnofsingledir (sockfd, atoi(s_pointer), j, d_pointer);
+				for (j = 0, h = (32 * i + j + 36) * 256; j < 256; ++j, ++h)
+					buf[j] = content[h];
+				buf[j] = '\0';
+				write_number (sockfd, atoi(d_pointer), buf, 0); 	
+			}
+		getnofsingledir (sockfd, atoi(pointer), i, s_pointer);
+		for (j = 0; j <= ( (size - 1) / 256 - 36 ) % 32; ++j) {		
+				getnofsingledir (sockfd, atoi(s_pointer), j, d_pointer);
+				for (k = 0, h = ( (size - 1) / 256 - 36 - ( (size - 1) / 256 - 36 ) % 32 + j) * 256; k < 256; ++k, ++h)
+					buf[k] = content[h];
+				buf[k] = '\0';
+				write_number (sockfd, atoi(d_pointer), buf, 0);
+		}			
+	}
+}
+
+void getcontent (int sockfd, int inode_no) {
+	int size = getsize (sockfd, inode_no);
+	int i, j;
+	int datanum;
+	char pointer[8];
+	char s_pointer[8];
+	char d_pointer[8];
+	char cont[257];
+	char single[256];
+	whole_cont[0] = '\0';
+	if (size == 0) return;
+	if ( (size - 1) / 256 < 4) {
+		for (i = 2; i <= (size - 1)/256 + 2; ++i) {
+			getnofinode (sockfd, inode_no, i, pointer);
+			//printf ("%s\n", pointer);
+			read_number (sockfd, atoi(pointer), cont, 0);
+			//printf ("%s\n", cont);
+			//if (i == 2) strcpy (tmp, cont);
+			strcat (whole_cont, cont);
+			//printf ("whole = %s\n", whole_cont);
+		}
+	}
+	else if ( ((size - 1) / 256) < 36) {
+		for (i = 2; i <= 5; ++i) {
+			getnofinode (sockfd, inode_no, i, pointer);
+			read_number (sockfd, atoi(pointer), cont, 0);
+			strcat (whole_cont, cont);
+		}
+		getnofinode (sockfd, inode_no, 6, pointer);
+		for (i = 0; i <= (size - 1) / 256 - 4; ++i) {
+			getnofsingledir(sockfd, atoi(pointer), i, s_pointer);
+			read_number (sockfd, atoi(s_pointer), cont, 0);
+			strcat (whole_cont, cont);
+		}
+	}
+	else {
+		for (i = 2; i <= 5; ++i) {
+				getnofinode (sockfd, inode_no, i, pointer);
+				read_number (sockfd, atoi(pointer), cont, 0);
+				if (i == 2) strcpy (whole_cont, cont);
+				else strcat (whole_cont, cont);
+		}
+		getnofinode (sockfd, inode_no, 6, pointer);
+		for (i = 0; i < 32; ++i) {
+			getnofsingledir(sockfd, atoi(pointer), i, s_pointer);
+			read_number (sockfd, atoi(s_pointer), cont, 0);
+			strcat (whole_cont, cont);
+		}
+		getnofinode (sockfd, inode_no, 7, pointer);
+		for (i = 0; i < ((size - 1) / 256 - 36) / 32; ++i)
+			for (j = 0; j < 32; ++j) {
+				getnofsingledir (sockfd, atoi(pointer), i, s_pointer);
+				getnofsingledir (sockfd, atoi(s_pointer), j, d_pointer);
+				read_number (sockfd, atoi(d_pointer), cont, 0); 	
+				strcat (whole_cont, cont);
+			}
+		getnofsingledir (sockfd, atoi(pointer), i, s_pointer);
+		for (j = 0; j <= ( (size - 1)/256 - 36 ) % 32; ++j) {		
+				getnofsingledir (sockfd, atoi(s_pointer), j, d_pointer);
+				read_number (sockfd, atoi(d_pointer), cont, 0); 	
+				strcat (whole_cont, cont);
+		}	
+	}
+	//strcpy (content, tmp);
+}
+
+void getnofsingledir (int sockfd, int data_no, int n, char *content) {
+	char res[9];
+	char buf[257];
+	int i, j;
+	read_number (sockfd, data_no, buf, 0);
+	for (i = n * 8, j = 0; j < 8; ++i, ++j) res[j] = buf[i];
+	res[j] = '\0';
+	strcpy (content, res);
+}
+
+void getnofinode (int sockfd, int inode_no, int n, char *content) { //get the n part of the inode.
+	char buf[64];
+	char res[8];
+	int i, j;
+	read_number (sockfd, inode_no, buf, 1);
+	for (i = n * 8, j = 0; j < 8; ++i, ++j)
+		res[j] = buf[i];
+	strcpy(content, res);
+}
+
+void writenofinode (int sockfd, int inode_no, int n, const char *content) {
+	char buf[65];
+	int i, j;
+	read_number (sockfd, inode_no, buf, 1);
+	buf[64] = '\0';
+	for (i = n * 8, j = 0; j < 8; ++i, ++j) 
+		buf[i] = content[j];
+	write_number (sockfd, inode_no, buf, 1);
+}
+
+void writenofsingledir (int sockfd, int data_no, int n, const char *content) {
+	char buf[257];
+	int i, j;
+	if (n == 0) write_number (sockfd, data_no, "0", 0);
+	read_number (sockfd, data_no, buf, 0);
+	for (i = n * 8, j = 0; j < 8; ++i, ++j) buf[i] = content[j];
+	write_number (sockfd, data_no, buf, 0);	
+	
+}
+
+int getsize (int sockfd, int inode_no) {  //get the size of file. given inode number
+	char inodeinfo[8];
+	int i, j;
+	getnofinode (sockfd, inode_no, 0, inodeinfo);
+	return atoi(inodeinfo); 	
+}
+
+int getfilenum (int sockfd, int inode_no) {  //get the num of file/dir of a dir. given inode number
+	char inodeinfo[8];
+	int i, j;
+	getnofinode (sockfd, inode_no, 1, inodeinfo);
+	return atoi(inodeinfo); 	
+}
+
+
+void initialdir (int sockfd, int inode_num, int pre_num) {
+	char buf[65];
+	sprintf (buf, "0.*000000000000000000000%08d0..*00000000000000000000%08d", inode_num, pre_num);
+	buf[64] = '\0';
+	writeback (sockfd, inode_num, buf);
+	char op[8];
+	sprintf (op, "%08d", 2);
+	writenofinode (sockfd, inode_num, 1, op);
+}
+
+
+
+int format (int sockfd) { 
+    int i;
+    char buf[1024];
+    bzero (buf, 1024);
+    inode_num = inode_empty = (c * s / 5) - ( ( c * s / 5 ) % 4 ); 
+    inode_sector = inode_num / 4;
+    //bitmap_sector_num = c * s / 256 + 1;
+    bitmap_sector_num = (inode_num * 4 + c * s - inode_sector) / 256 + 1 ;
+    bitmap_start_sector = c * s - 1 - bitmap_sector_num;
+    data_num = data_empty = c * s - bitmap_sector_num - inode_num;
+    update_superblock (sockfd);
+    for (i = bitmap_start_sector; i < c * s - 1; ++i) write_c_s (sockfd, i/s, i%s, "0");
+	update_bitmap (sockfd, 0, 1, 1);//root 's inode
+	update_bitmap (sockfd, 0, 1, 0);//root 's dir
+	//initialize dir 
+	cur_dir = 0;
+	for (i = 0; i < inode_sector; ++i) write_c_s (sockfd, i/s, i%s, "0");
+	writenofinode (sockfd, 0, 0, "00000064");
+	writenofinode (sockfd, 0, 1, "00000002");
+	write_number (sockfd, 0, "0.*000000000000000000000000000000..*0000000000000000000000000000", 0);
+	return 1;            
+}
+
+int make_file (int sockfd, const char *filename) {
+	int i, j, h;
+	if (inode_empty == 0 || data_empty == 0) return 2;
+	int filenumber = getfilenum (sockfd, cur_dir);
+	getcontent(sockfd, cur_dir);
+	if (check_repeat (whole_cont, filename, filenumber, 1) != -1) return 1;
+	int new_inode_num = find_empty(sockfd, 1);
+	write_number (sockfd, new_inode_num, "0", 1);	
+	int size = getsize (sockfd, cur_dir);
+	char pointer[8];
+	sprintf (pointer,"%08d",new_inode_num);
+	i = filenumber * 32;
+	whole_cont[i] = '1';
+	for (h = i + 1, j = 0; j < strlen(filename); ++h, ++j)
+		whole_cont[h] = filename[j];
+	whole_cont[h] = '*';
+	for (h = i + 24, j = 0; j < 8; ++j, ++h)
+		whole_cont[h] = pointer[j];
+	whole_cont[h] = '\0';
+	writeback (sockfd, cur_dir, whole_cont);
+	update_bitmap (sockfd, new_inode_num, 1, 1);
+	update_add_file_info(sockfd, size, filenumber);
+	return 0;
+}
+
+int make_dir (int sockfd, const char *dirname) {
+	int i, h, j;
+	if (inode_empty == 0 || data_empty == 0) return 2;
+	int filenumber = getfilenum (sockfd, cur_dir);
+	getcontent (sockfd, cur_dir);
+	if (check_repeat (whole_cont, dirname, filenumber, 0) != -1) return 1;
+	int new_inode_num = find_empty(sockfd, 1);
+	write_number (sockfd, new_inode_num, "0", 1);
+	int size = getsize (sockfd, cur_dir);
+	char pointer[8];
+	sprintf (pointer,"%08d",new_inode_num);
+	i = filenumber * 32;
+	whole_cont[i] = '0';
+	for (h = i + 1, j = 0; j < strlen(dirname); ++h, ++j)
+		whole_cont[h] = dirname[j];
+	whole_cont[h] = '*';
+	for (h = i + 24, j = 0; j < 8; ++j, ++h)
+		whole_cont[h] = pointer[j];
+	whole_cont[h] = '\0';
+	writeback (sockfd, cur_dir, whole_cont);
+	update_bitmap (sockfd, new_inode_num, 1, 1);
+	update_add_file_info(sockfd, size, filenumber);
+	initialdir (sockfd, new_inode_num, cur_dir);
+	return 0;
+}
+
+
+
+
+
+int remove_file (int sockfd, const char *filename) {
+	int i, j;	
+	char pointer[9];
+	int fnum = getfilenum (sockfd, cur_dir);
+	getcontent (sockfd, cur_dir);
+	int start = check_repeat(whole_cont, filename, fnum, 1);
+	int size = getsize (sockfd, cur_dir);
+	if (start == -1) return 1;
+	for (i = start + 24, j = 0; j < 8; ++i, ++j)
+		pointer[j] = whole_cont[i];
+	pointer[j] = '\0';
+	for (i = start, j = size - 32; j < size; ++i, ++j) {
+		whole_cont[i] = whole_cont[j];
+	}
+	whole_cont[size - 32] = '\0';
+	writeback (sockfd, cur_dir, whole_cont);
+	writeback (sockfd, atoi(pointer), "\0");
+	update_bitmap (sockfd, atoi(pointer), 0, 1);
+    update_superblock (sockfd);
+    char op[9];
+    sprintf (op, "%08d", fnum - 1);
+    writenofinode (sockfd, cur_dir, 1, op);
+	return 0;
+}
+
+
+
+int check_repeat (const char *dir_content, const char *filename, int file_num, bool ford) {
+	//if (file_num == 2) return -1;	
+	int count = 0;
+	char t[24];
+	char *name;
+	int i, j;
+	for (i = 0; count < file_num; i = i + 32, ++count) { 
+		if ( ( ford && ( dir_content[i] == '1') ) || ( !ford && ( dir_content[i] == '0') ) ) {
+			for (j = 0; j < 23; ++j)
+				t[j] = dir_content[i + 1 + j];
+			t[23] = '\0';
+			name = strtok (t, "*");
+			if(!strcmp(name, filename)) return i;			
+		}
+	}
+	return -1;
+}
+
+int change_dir (int sockfd, char *path) {
+	char pointer[9];
+	char *p[100];	
+	int i, j, h, d, fnum;
+	if (path[0] != '/') {
+		getcontent (sockfd, cur_dir);
+		fnum = getfilenum(sockfd, cur_dir);
+		d = check_repeat(whole_cont, path, fnum, 0);
+		if (d == -1) return 1;
+		for (i = d + 24, j = 0; j < 8; ++i, ++j) pointer[j] = whole_cont[i];
+		pointer[j] = '\0';
+		cur_dir = atoi(pointer);
+	}
+	else {
+		int count = parseLine2(path + 1, p);
+		int c_dir = 0;
+		for (i = 0; i < count; ++i) {
+			getcontent (sockfd, c_dir);
+			fnum = getfilenum (sockfd, c_dir);
+			d = check_repeat (whole_cont, p[i], fnum, 0);
+			if (d == -1) return 1;
+			for (h = d + 24, j = 0; j < 8; ++h, ++j) pointer[j] = whole_cont[h];
+			pointer[j] = '\0';
+			c_dir = atoi(pointer);
+		}
+		cur_dir = c_dir;
+	}
+	return 0;
+}
+
+
+int list(int sockfd, const char *flag) {
+	int i, j;
+	l[0] = '\0';
+	char name[30];	
+	char filename[30];
+	char pointer[9];
+	char size[9];
+	int fnum = getfilenum (sockfd, cur_dir);	
+	getcontent (sockfd, cur_dir);
+	if (!strcmp  (flag, "0")) {
+		for (i = 0; i < fnum; ++i) {
+			if (whole_cont[i * 32] == '0')  
+				strcat (l, "Dir  ");
+			else 
+				strcat (l, "File ");
+			for (j = 0; j < 24; ++j) {
+				name[j] = whole_cont[i * 32 + j + 1];
+			}
+			strcat (l, strtok(name, "*"));
+			strcat (l, "\n");
+		}	
+	}
+	else if (!strcmp( flag, "1") ){
+		strcpy (l, "     name\t size/filenumber\n");
+		for (i = 0; i < fnum; ++i) {
+			if (whole_cont[i * 32] == '0') {
+				strcat(l, "Dir  ");
+				for (j = 0; j < 24; ++j) {
+					name[j] = whole_cont[i * 32 + j + 1];
+				}
+				strcat (l, strtok(name, "*"));
+				for (j = 0; j < 8; ++j) pointer[j] = whole_cont[i * 32 + 24 + j];
+				pointer[j] = '\0';
+				getnofinode (sockfd, atoi(pointer), 1, size);
+				sprintf (size, "%d files", atoi(size) - 2);
+				strcat (l, "     \t");
+				strcat (l, size);
+				strcat (l, "\n");
+			}
+			else {
+				strcat (l, "File ");
+				for (j = 0; j < 24; ++j) {
+					name[j] = whole_cont[i * 32 + j + 1];
+				}
+				strcat (l, strtok(name, "*"));
+				for (j = 0; j < 8; ++j) pointer[j] = whole_cont[i * 32 + 24 + j];
+				pointer[j] = '\0';
+				getnofinode (sockfd, atoi(pointer), 0, size);
+				sprintf (size, "%d bytes", atoi(size));
+				strcat (l, "\t");
+				strcat (l, size);
+				strcat (l, "\n");
+			}
+		}
+	}
+	else return 1;
+	return 0;
+}
+
+int write_to_file (int sockfd, const char *filename, int length, const char *content) {	
+	if (length != strlen(content)) return 2;	
+	getcontent (sockfd, cur_dir);	
+	int size;
+	int fnum = getfilenum (sockfd, cur_dir);
+	int d = check_repeat (whole_cont, filename, fnum, 1);
+	char pointer [9];
+	int i;
+	if (d == -1) return 1;
+	for (i = 0; i < 8; ++i) 
+		pointer[i] = whole_cont[d + i + 24];
+	pointer[i] = '\0';
+	size = getsize (sockfd, atoi(pointer));
+	if ( (length - size - 1) / 256 + 1 > data_empty) return 3;
+	writeback (sockfd, atoi(pointer), content);
+}
+
+int append_to_file (int sockfd, const char *filename, int length, const char *content) {
+	if (length != strlen(content)) return 2;
+	if ( (length - 1) / 256 + 1 > data_empty) return 3;
+	getcontent (sockfd, cur_dir);
+	int size; 
+	int fnum = getfilenum (sockfd, cur_dir);
+	int d = check_repeat (whole_cont, filename, fnum, 1);
+	char pointer[9];
+	int i, j;
+	if (d == -1) return 1;
+	for (i = 0; i < 8; ++i)
+		pointer[i] = whole_cont[d + i + 24];
+	pointer[i] = '\0';
+	size = getsize (sockfd, atoi(pointer));
+	getcontent (sockfd, atoi(pointer));
+	for (i = 0, j = size; i < length; ++i, ++j) whole_cont[j] = content[i];
+	whole_cont[j] = '\0';
+	writeback (sockfd, atoi(pointer), whole_cont);
+}
+
+int catch_file (int sockfd, const char *filename) {
+	getcontent (sockfd, cur_dir);
+	int size;
+	int fnum = getfilenum (sockfd, cur_dir);
+	int d = check_repeat (whole_cont, filename, fnum, 1);
+	char pointer[9];
+	int i, j;
+	if (d == -1) return 1;
+	for (i = 0; i < 8; ++i) 
+		pointer[i] = whole_cont[d + 24 + i];
+	pointer[i] = '\0';	
+	getcontent (sockfd, atoi(pointer));
+	size = getsize (sockfd, atoi(pointer));
+	whole_cont[size] = '\0';	
+	return 0;
+}
+
+int remove_dir (int sockfd, const char *dirname) {
+	char pointer[9];
+	int i, j;
+	int fnum = getfilenum (sockfd, cur_dir);
+	getcontent (sockfd, cur_dir);
+	int size = getsize (sockfd, cur_dir);
+	int start = check_repeat (whole_cont, dirname, fnum, 0);
+	if (start == -1) return 1;
+	for (i = start + 24, j = 0; j < 8; ++i, ++j) pointer[j] = whole_cont[i];
+	pointer[j] = '\0';
+	for (i = start, j = size - 32; j < size; ++i, ++j) whole_cont[i] = whole_cont[j];
+	whole_cont[size - 32] = '\0';
+	writeback (sockfd, cur_dir, whole_cont);
+	remove_dir_inodenum (sockfd, atoi(pointer));
+    update_superblock (sockfd);
+    sprintf (pointer, "%08d", fnum - 1);
+    writenofinode (sockfd, cur_dir, 1, pointer);
+	return 0;
+}
+
+void remove_dir_inodenum (int sockfd, int inode_num) {
+	int i, j;
+	char op[9];
+	getcontent (sockfd, inode_num);
+	int fnum = getfilenum (sockfd, inode_num);
+	for (i = 2; i < fnum; ++i) {
+		if (whole_cont[i * 32] == '1') {
+			for (j = 0; j < 8; ++j) op[j] = whole_cont[i * 32 + 24 + j];
+			op[j] = '\0';
+			writeback(sockfd, atoi(op), "\0");
+			update_bitmap(sockfd, atoi(op), 0, 1);
+		}
+		else if (whole_cont[i * 32] == '0') {
+			for (j = 0; j < 8; ++j) op[j] = whole_cont[i * 32 + 24 + j];
+			op[j] = '\0';
+			remove_dir_inodenum(sockfd, atoi(op));
+		}
+	}
+	writeback(sockfd, inode_num, "\0"); 
+	update_bitmap (sockfd, inode_num, 0, 1);
+}
+
+

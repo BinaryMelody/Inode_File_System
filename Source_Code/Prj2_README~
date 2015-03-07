@@ -1,0 +1,17 @@
+./
+makefile	makefile document
+Prj2_README	The instruction file you are reading now
+Prj2_Report	Technical Report of project2
+typescript	Test runs for project2
+
+.src
+BDS.c		Basic disk server for BDC_command and BDC_random		./BDS filename cylinders sectors tracktotrackdelay 10356
+BDC_command.c	Command line client for BDS					./BDC_command localhost 10356
+BDC_random.c	Random client for BDS and IDS					./BDC_random localhost 10356(11356) N
+IDS.c		Intelligent disk server using FCFS SSTF CLOOK			./IDS filename cylinders sectors tracktotrackdelay 11356 n
+BDS_for_FS.c	Basic disk server for FS (For detailed, see BDS_for_FS.c)	./BDS filename cylinders sectors tracktotrackdelay 10356
+FS.c		File System, work as server for FC and client for BDS_for_FS	./FS localhost 10356 12356
+FC.c		File System Client						./FC localhost 12356
+headers.h	The header file of Project2
+
+.build		build files and files work as disks will occur here

@@ -1,0 +1,288 @@
+###################################
+BDS
+./BDS filename 100 100 1 10356
+
+BDC_command
+./BDC_command localhost 10356
+
+I
+100 100
+W 10 10 15 asdfzzm 1234132 
+Yes
+R 110 110
+No
+W 110 110
+No
+R 10 10
+Yes asdfzzm 1234132
+exit
+
+###################################
+BDS
+./BDS filename 100 100 1 10356
+
+BDC_random
+./BDC_random localhost 10356 100
+1 W
+2 W
+3 W
+4 R
+5 R
+6 R
+7 R
+8 R
+9 R
+10 R
+11 R
+12 W
+13 R
+14 R
+15 R
+16 R
+17 R
+18 W
+19 W
+20 R
+21 W
+22 W
+23 R
+24 W
+25 R
+26 R
+27 R
+28 W
+29 R
+30 W
+31 R
+32 W
+33 R
+34 W
+35 W
+36 R
+37 W
+38 W
+39 W
+40 R
+41 W
+42 W
+43 W
+44 R
+45 R
+46 W
+47 R
+48 W
+49 W
+50 R
+51 W
+52 W
+53 W
+54 R
+55 R
+56 R
+57 R
+58 R
+59 W
+60 W
+61 R
+62 W
+63 R
+64 W
+65 R
+66 R
+67 W
+68 W
+69 W
+70 W
+71 W
+72 W
+73 W
+74 W
+75 R
+76 W
+77 R
+78 R
+79 R
+80 R
+81 W
+82 R
+83 W
+84 W
+85 W
+86 W
+87 R
+88 W
+89 R
+90 R
+91 R
+92 R
+93 W
+94 W
+95 R
+96 W
+97 R
+98 W
+99 W
+100 R
+
+./BDC_random localhost 10356
+ERROR: Wrong num of arguments!
+
+##################################
+./BDS_for_FS malitian 50 50 1 10356
+
+./FS localhost 10356 12356
+
+./BDC_random localhost 11356 200
+
+FCFS_delay 6563
+83 26 14 14 47 35 54 86 59 83 23 22 79 38 70 60 65 86 95 3 32 38 58 34 78 78 86 25 26 76 30 37 4 46 24 82 37 46 0 26 80 61 77 10 84 85 30 12 70 46 72 11 62 35 6 38 67 90 94 2 91 12 13 74 58 94 27 72 25 32 4 57 78 86 33 92 14 53 97 91 0 62 64 97 92 70 25 26 35 79 9 13 41 28 80 28 53 19 94 72 42 51 47 67 40 45 32 87 61 98 51 19 97 45 68 23 97 30 22 43 33 76 78 64 22 4 3 39 48 72 6 0 23 83 87 27 48 53 84 89 19 9 11 20 61 13 99 83 71 59 64 8 5 7 69 98 58 46 24 3 2 60 73 31 52 86 29 35 61 55 21 93 29 79 29 37 38 20 49 98 48 6 2 13 96 2 7 19 22 28 45 93 71 35 79 18 34 20 94 13 
+SSTF_delay 2121
+14 14 26 35 47 54 59 83 83 86 86 79 70 65 60 38 23 22 3 95 86 78 78 76 58 38 34 32 26 25 24 26 30 37 37 46 46 82 4 0 10 12 30 46 61 70 77 80 84 85 90 94 72 67 62 38 35 11 6 2 12 13 25 27 32 58 72 74 91 94 92 91 86 78 97 57 53 33 14 4 0 25 26 35 62 64 70 79 92 97 94 80 72 53 41 28 28 19 13 9 32 40 42 45 47 51 61 67 87 98 97 97 68 51 45 43 30 23 22 19 22 33 39 48 64 72 76 78 4 3 6 0 23 27 48 53 83 84 87 89 83 71 61 59 20 19 13 11 9 99 98 69 64 58 46 24 8 7 5 3 2 29 31 35 52 55 60 61 73 86 93 98 79 49 38 37 29 29 21 20 19 22 28 13 7 6 2 2 48 96 94 93 79 71 45 35 34 20 18 13 
+CLOOK_delay 2960
+14 14 26 35 47 54 59 83 83 86 86 95 3 22 23 38 60 65 70 79 86 25 26 32 34 38 58 76 78 78 82 0 4 24 26 30 37 37 46 46 46 61 70 77 80 84 85 10 12 30 35 38 62 67 72 90 94 2 6 11 12 13 25 27 32 58 72 74 91 94 97 4 14 33 53 57 78 86 91 92 92 97 0 25 26 35 62 64 70 79 80 94 9 13 19 28 28 41 53 72 87 98 32 40 42 45 47 51 61 67 68 97 97 19 22 23 30 43 45 51 64 72 76 78 3 4 22 33 39 48 48 53 83 84 87 89 0 6 23 27 59 61 71 83 99 9 11 13 19 20 24 46 58 64 69 98 3 5 7 8 29 31 35 52 55 60 61 73 86 2 20 21 29 29 37 38 49 79 93 98 2 2 6 7 13 19 22 28 48 96 13 18 20 34 35 45 71 79 93 94
+
+##################################
+./FC localhost 12356
+f
+Success! Format.
+mk file1
+Success! Create file.
+mk file2
+Success! Create file.
+mkdir dir1
+Success! Create directory.
+mkdir dir2
+Success! Create directory.
+cd dir1
+Success! Change to new directory.
+cd dir2
+Fail! No such directory exists.
+mkdir dir1
+Success! Create directory.
+cd dir1
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	0 files
+Directory	..	1 files
+
+cd .
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	0 files
+Directory	..	1 files
+
+cd ..
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	1 files
+Directory	..	4 files
+Directory	dir1	0 files
+
+cd /dir1/dir1
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	0 files
+Directory	..	1 files
+
+mkdir dir
+Success! Create directory.
+cd /dir1/dir1    
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	1 files
+Directory	..	1 files
+Directory	dir	0 files
+
+cd /
+Success! Change to new directory.
+ls 0
+Type		Name
+Directory	.
+Directory	..
+File		file1
+File		file2
+Directory	dir1
+Directory	dir2
+
+cd dir1/dir1     
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	1 files
+Directory	..	1 files
+Directory	dir	0 files
+
+mk testfile
+Success! Create file.
+a testfile 255 adsfadfadfasdflahdkjfhqljekrhqljekhqlkejhqljbna,bdflajhfdalkjfhlajerkhqljkerhljkdfhoiuyzuhflajhfqlerhjljahdlafjhfladjkfhalskdjfhaljksdfahldkjfhlejrhqljrehlajdhlfadjfahljfhqlkejrhqlerkjqlrjkhafldjahldfjalkdsaklsdfhakldhjakldsjfahldsjfhaldjfaffasasdfasdfasd
+w testfile 20 asdfasdfasdfasdfasdf
+Success! Rewrite file content.asdf
+a testfile 10 asdfasdfas
+Success! Append file content.
+cat testfile
+Success! Catch file.
+asdfasdfasdfasdfasdfasdfasdfas
+a testfile 233 asdfassdkfjadslfalkjsdfhalsdkjfakljsdfasdkjflakjdsfakljdsfakldsfhaslkdjfkxjchvkyuaodfqlekjrhqkljerhkjahlksjhlajkdsfhakjsdfhqkerhqjwekrhiucyvcoadufiqyeroquiweryqoiueuwryqoeiruqyweoruiqweryzycxvoiuaydfqorwueiqoewuirqyoeuirqoqiuewryqweo
+Success! Append file content.lfalkjsdfhalsdkjfakljsdfasdkjflakjdsfakljdsfakldsfhaslkdjfkxjchvkyuaodfqlekjrhqkljerhkjahlksjhlajkdsfhakjsdfhqkerhqjwekrhiucyvcoadufiqyeroquiweryqoiueuwryqoeiruqyweoruiqweryzycxvoiuaydfqorwueiqoewuirqyoeuirqoqiuewryqweo
+cat testfile 
+Success! Catch file.
+asdfasdfasdfasdfasdfasdfasdfasasdfassdkfjadslfalkjsdfhalsdkjfakljsdfasdkjflakjdsfakljdsfakldsfhaslkdjfkxjchvkyuaodfqlekjrhqkljerhkjahlksjhlajkdsfhakjsdfhqkerhqjwekrhiucyvcoadufiqyeroquiweryqoiueuwryqoeiruqyweoruiqweryzycxvoiuaydfqorwueiqoewuirqyoeuirqoqiuewryqweo
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	2 files
+Directory	..	1 files
+Directory	dir	0 files
+File		testfile	263 bytes
+
+rm testfile
+Success! Remove file.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	1 files
+Directory	..	1 files
+Directory	dir	0 files
+
+cd /
+Success! Change to new directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	4 files
+Directory	..	4 files
+File		file1	0 bytes
+File		file2	0 bytes
+Directory	dir1	1 files
+Directory	dir2	0 files
+
+rmdir dir1
+Success! Remove directory.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	3 files
+Directory	..	3 files
+File		file1	0 bytes
+File		file2	0 bytes
+Directory	dir2	0 files
+
+f
+Success! Format.
+ls 1
+Type		Name	File_Num/File_Size
+Directory	.	0 files
+Directory	..	0 files
+
+test wrong
+Fail! Error command.
+f asdfa
+Fail! Error command.
+w wer e d 
+Fail! Data length not proper.
+a we er  w
+Fail! Data length not proper.
+exit
+Success! Exit file system.
+
